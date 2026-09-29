@@ -1,7 +1,7 @@
 # Sauce Demo — Playwright + pytest POM
 
 KISS test framework for [saucedemo.com](https://www.saucedemo.com/).
-Python, UV, Playwright, pytest, Page Object Model, Allure.
+Python, UV, Playwright, pytest, pytest-bdd, Page Object Model, Allure.
 
 ## Layout
 
@@ -11,7 +11,9 @@ conftest.py              # fixtures + Allure screenshot-on-fail + HTML report
 data/users.py            # get_user("standard") -> (login, password)
 helpers/customer.py      # Faker: get_customer() -> first / last / ZIP
 pages/                   # one class per screen — selectors + actions
-tests/                   # what the user does, not how the DOM works
+tests/features/          # Gherkin scenarios (pytest-bdd)
+tests/test_*.py          # @scenario bindings + step definitions
+tests/conftest.py        # steps shared across features
 allure-results/          # raw Allure JSON (gitignored)
 reports/index.html       # single-file HTML report (gitignored)
 logs/test_run.log        # INFO/DEBUG log of the last run (gitignored)
