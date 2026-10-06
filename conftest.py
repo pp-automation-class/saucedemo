@@ -41,6 +41,10 @@ def pytest_runtest_makereport(item, call):
     if report.when == "call" or report.outcome != "passed":
         log.info("===== %s %s (%s)", report.outcome.upper(), item.nodeid, report.when)
 
+    if report.when == "teardown":
+        _attach_videos(item)
+        return
+
     if report.when != "call" or not report.failed:
         return
 
@@ -58,6 +62,25 @@ def pytest_runtest_makereport(item, call):
         name="page url",
         attachment_type=allure.attachment_type.TEXT,
     )
+
+
+def _attach_videos(item) -> None:
+    """Attach artifacts/<test>/video*.webm to Allure.
+
+    Needs `--video on` or `--video retain-on-failure`.
+
+    pytest-playwright writes the video only after the browser context closes,
+    i.e. during teardown — that's why this runs on the teardown report.
+    """
+    # pytest-playwright's per-test folder; only present for browser tests.
+    output_path = (item.funcargs or {}).get("output_path")
+    if not output_path:
+        return
+    for video in sorted(Path(output_path).glob("video*.webm")):
+        log.info("Attach video %s", video)
+        allure.attach.file(
+            str(video), name=video.name, attachment_type=allure.attachment_type.WEBM
+        )
 
 
 def pytest_sessionfinish(session, exitstatus):
