@@ -10,9 +10,11 @@ from pathlib import Path
 
 import allure
 import pytest
-from playwright.sync_api import Page
+from playwright.sync_api import BrowserContext, Page
 
+from api.book_store_api import BASE_URL as DEMOQA, BookStoreApi
 from data.users import get_user
+from helpers.book_user import get_book_user
 from pages.cart_page import CartPage
 from pages.checkout_page import (
     CheckoutCompletePage,
@@ -130,3 +132,54 @@ def logged_in(login_page: LoginPage, inventory_page: InventoryPage) -> Inventory
     login_page.open()
     login_page.login(*get_user("standard"))
     return inventory_page
+
+
+# ---------- DemoQA Book Store (API + UI) ----------
+
+
+@pytest.fixture
+def book_api() -> BookStoreApi:
+    return BookStoreApi()
+
+
+@pytest.fixture
+def book_user(book_api: BookStoreApi):
+    """Create + log in a fresh user via API. Delete it afterwards if the test did not.
+
+    Yields {"id", "username", "password"}.
+    """
+    username, password = get_book_user()
+
+    response = book_api.create_user(username, password)
+    assert response.status_code == 201, response.text
+    body = response.json()
+    assert body["username"] == username
+    assert body["books"] == []
+    # Swagger says `userId`, the real response says `userID`.
+    user_id = body["userID"]
+
+    book_api.login(username, password)
+    yield {"id": user_id, "username": username, "password": password}
+
+    # Safety net: a failed test must not leave the user behind.
+    if book_api.get_user(user_id).status_code == 200:
+        book_api.delete_user(user_id)
+
+
+@pytest.fixture
+def book_store_ui(context: BrowserContext, book_api: BookStoreApi, book_user) -> dict:
+    """Log the browser in with the API's token (no login form).
+
+    DemoQA keeps one token per user, so a UI form login would kill the API
+    token. Sharing it through the same cookies the site sets keeps both alive.
+    """
+    cookies = {
+        "token": book_api.token,
+        "expires": book_api.token_expires,
+        "userID": book_user["id"],
+        "userName": book_user["username"],
+    }
+    context.add_cookies(
+        [{"name": k, "value": v, "url": DEMOQA} for k, v in cookies.items()]
+    )
+    return book_user
