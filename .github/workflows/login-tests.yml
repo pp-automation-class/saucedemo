@@ -1,0 +1,97 @@
+# Nightly login tests, plus a button to run them yourself.
+name: login tests
+
+on:
+  schedule:
+    # Five fields, in order: minute hour day-of-month month day-of-week.
+    #   0  2  *  *  *
+    #   |  |  |  |  +-- day of week (* = every day, 0 is Sunday)
+    #   |  |  |  +----- month (* = every month)
+    #   |  |  +-------- day of month (* = every day of the month)
+    #   |  +----------- hour 2
+    #   +-------------- minute 0
+    # So this is 02:00 every day. GitHub cron is UTC only, no timezone field.
+    # 02:00 UTC is 22:00 EDT (UTC-4).
+    # In winter the US East is on EST (UTC-5), so this same line is 21:00 then.
+    # A schedule runs only from the default branch (main). A copy on another
+    # branch does nothing until that file is merged.
+    - cron: "0 2 * * *"
+  # "Run workflow" on the Actions tab.
+  # "Use workflow from" picks which copy of this file runs.
+  # The branch input below picks which code is tested. Blank means main.
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: Branch to test
+        required: false
+        default: main
+        type: string
+      # Playwright --video=on. Off by default; the nightly cron does not record.
+      video:
+        description: Record a video of each test
+        required: false
+        default: false
+        type: boolean
+      # Upload artifacts/, allure-results/, and logs/test_run.log.
+      # On for a manual run unless you uncheck it. The nightly cron always uploads.
+      save_results:
+        description: Save test results as artifacts
+        required: false
+        default: true
+        type: boolean
+
+jobs:
+  login:
+    runs-on: ubuntu-latest
+    steps:
+      # Nightly cron has no inputs, so this falls back to main.
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.branch || 'main' }}
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          python-version-file: ".python-version"
+          enable-cache: true
+
+      # Full lockfile this time: pytest and Playwright, not just flake8.
+      - name: Install dependencies
+        run: uv sync --frozen
+
+      # The runner has no browser. --with-deps also installs the OS libraries
+      # Chromium needs.
+      - name: Install Chromium
+        run: uv run playwright install chromium --with-deps
+
+      # get_user() reads .env. These are the demo accounts printed on
+      # https://www.saucedemo.com/ — not private passwords.
+      # The file is gitignored, so it exists only on this runner.
+      - name: Write .env
+        run: |
+          cat > .env << 'EOF'
+          STANDARD_USER=standard_user/secret_sauce
+          LOCKED_OUT_USER=locked_out_user/secret_sauce
+          EOF
+
+      # tests/test_login.py is every login test. addopts in pyproject.toml
+      # already select Chromium, the Sauce Demo base URL, and --output=artifacts.
+      # --video=on writes a .webm per test into that same artifacts/ folder.
+      - name: Run login tests
+        run: >-
+          uv run pytest tests/test_login.py
+          ${{ inputs.video == true && '--video=on' || '' }}
+
+      # always() would also upload after a cancel. !cancelled() still uploads
+      # when the tests fail, which is when the video and screenshots matter.
+      # actions/upload-artifact stores the files on the run for 90 days.
+      - name: Upload test results
+        if: ${{ !cancelled() && (github.event_name != 'workflow_dispatch' || inputs.save_results) }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: login-test-results
+          path: |
+            artifacts/
+            allure-results/
+            logs/test_run.log
+          if-no-files-found: warn
