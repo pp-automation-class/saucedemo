@@ -20,5 +20,5 @@ def test_locked_out_user_sees_error(login_page):
 
     expect(login_page.error).to_be_visible()
     expect(login_page.error).to_be_visible()
-    expect(login_page.error).to_contain_text("locked out sdhjkfgshjkdgfbkjsdbgjksbdjkg;bsfkjgbsfkjghosfjhglsjrhglj'srhgoj'rshgj'rshgjl'hs'LJGHRsl'jghrosj'GH'SJLrhbgjl'r")
+    expect(login_page.error).to_contain_text("locked out")
     expect(login_page.page).to_have_url("/")
