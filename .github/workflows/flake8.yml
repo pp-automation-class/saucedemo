@@ -1,0 +1,34 @@
+# Shown as the check name on the pull request.
+name: flake8
+
+# Run this file only when a pull request is opened or updated.
+# A push straight to main does not start it.
+on:
+  pull_request:
+
+jobs:
+  flake8:
+    # Fresh Ubuntu VM. Nothing from your laptop is on it.
+    runs-on: ubuntu-latest
+    steps:
+      # The VM starts empty. This copies the PR branch into it.
+      - uses: actions/checkout@v4
+
+      # Install uv, then the Python version named in .python-version (3.13).
+      # enable-cache keeps the downloaded uv/Python so the next run is faster.
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          python-version-file: ".python-version"
+          enable-cache: true
+
+      # Install from uv.lock, not whatever the newest flake8 on PyPI is today.
+      # --frozen fails the job if pyproject.toml and uv.lock disagree.
+      # --only-group dev installs flake8 and skips Playwright, pytest, and the rest.
+      - name: Install flake8
+        run: uv sync --frozen --only-group dev
+
+      # Lint the repo with the rules in .flake8.
+      # A non-zero exit fails this check and blocks a protected merge.
+      - name: Run flake8
+        run: uv run flake8
