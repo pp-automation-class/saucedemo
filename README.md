@@ -6,12 +6,15 @@ Python, UV, Playwright, pytest, Page Object Model, Allure.
 ## Layout
 
 ```
-conftest.py              # fixtures + Allure screenshot-on-fail + HTML report
+conftest.py              # page fixtures, logged_in, screenshot-on-fail, HTML report
 .env / .env.example      # login/password pairs (do not commit .env)
 data/users.py            # get_user("standard") -> (login, password)
 helpers/customer.py      # Faker: get_customer() -> first / last / ZIP
 pages/                   # one class per screen — selectors + actions
-tests/                   # what the user does, not how the DOM works
+tests/test_login.py      # standard user reaches inventory; locked-out error
+tests/test_inventory.py  # catalog lists 6 products; cart badge goes 0 -> 1
+tests/test_checkout.py   # buy the backpack through to the thank-you page
+pyproject.toml           # dependencies and pytest options
 allure-results/          # raw Allure JSON (gitignored)
 reports/index.html       # single-file HTML report (gitignored)
 logs/test_run.log        # INFO/DEBUG log of the last run (gitignored)
@@ -36,6 +39,10 @@ brew install allure           # once — needed to build reports/index.html
 ```env
 STANDARD_USER=login/password
 LOCKED_OUT_USER=login/password
+PROBLEM_USER=login/password
+PERFORMANCE_GLITCH_USER=login/password
+ERROR_USER=login/password
+VISUAL_USER=login/password
 ```
 
 ```python
@@ -52,6 +59,19 @@ from helpers.customer import get_customer
 
 customer = get_customer()  # {"first_name", "last_name", "postal_code"}
 ```
+
+`get_user("standard")` and `get_user("STANDARD_USER")` are the same key.
+The current tests use `standard` and `locked_out`. The other four are in `.env.example` for later cases.
+
+## Tests
+
+`logged_in` opens the site and signs in as `standard`. Inventory and checkout start there. Login tests use `login_page` and do not use that fixture.
+
+| File | What it checks |
+|---|---|
+| `tests/test_login.py` | standard user lands on Products; locked-out user stays on `/` with the error |
+| `tests/test_inventory.py` | Sauce Labs Backpack is one of 6 products; adding it sets the cart badge to 1 |
+| `tests/test_checkout.py` | backpack in the cart, overview total `$32.39`, then "Thank you for your order!" |
 
 ## Run
 
