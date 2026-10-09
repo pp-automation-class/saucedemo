@@ -28,6 +28,7 @@ uv run playwright install chromium
 brew install allure           # once — needed to build reports/index.html
 ```
 
+
 ## Credentials
 
 `.env` — one pair per user, `login/password`. `.env.example` is placeholders only.
